@@ -1,11 +1,21 @@
 import os
 import json
+import logging
 from typing import Any, Dict, Optional
 import httpx
 from mcp.server.fastmcp import FastMCP
 
-# Initialize the FastMCP server
 mcp = FastMCP("Universal Secure HTTP Client")
+
+# Read the flag from environment variables
+IS_DEBUG_ENABLED = os.environ.get("MCP_DEBUG", "").lower() == "true"
+
+if IS_DEBUG_ENABLED:
+    logging.basicConfig(
+        filename="/tmp/mcp_debug.log",
+        level=logging.INFO,
+        format="%(asctime)s - %(message)s"
+    )
 
 def load_predefined_headers() -> Dict[str, str]:
     """Bakes in default headers from your MCP configuration environment."""
@@ -36,16 +46,25 @@ async def send_request(
     json_data: Optional[Dict[str, Any]] = None,
     params: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """
-    Sends an HTTP request. Automatically injects tokens and headers 
-    predefined in the server configuration file.
-    """
+    """Sends an HTTP request with predefined configuration headers."""
     method = method.upper()
     
-    # Merge the predefined headers with any runtime headers the LLM generates
+    # This call will now find the function correctly right above it
     merged_headers = load_predefined_headers()
     if headers:
         merged_headers.update(headers)
+
+    # --- CONDITIONAL DEBUG LOGGING ---
+    if IS_DEBUG_ENABLED:
+        debug_payload = {
+            "URL": url,
+            "Method": method,
+            "Final_Headers": merged_headers,
+            "Query_Params": params,
+            "JSON_Body": json_data
+        }
+        logging.info(f"FINAL REQUEST PARAMS:\n{json.dumps(debug_payload, indent=2)}")
+    # ---------------------------------
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
